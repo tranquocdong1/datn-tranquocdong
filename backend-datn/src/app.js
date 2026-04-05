@@ -1,30 +1,16 @@
-const express = require("express");
-const cors = require("cors");
-const { CORS_ORIGIN } = require("./config/env");
+const express = require('express');
+const cors    = require('cors');
+const app     = express();
 
-const statusRoutes = require("./routes/statusRoutes");
-const controlRoutes = require("./routes/controlRoutes");
-const rfidRoutes = require("./routes/rfidRoutes");
-const logRoutes = require("./routes/logRoutes");
-
-const app = express();
-
-app.use(cors({
-  origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN,
-}));
-
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Binnbom Smart Home Backend is running 🚀",
-  });
-});
+// Routes
+app.use('/api/auth',    require('./routes/auth'));
+app.use('/api/door',    require('./routes/door'));
+app.use('/api/room',    require('./routes/room'));
+app.use('/api/clothes', require('./routes/clothes'));
 
-app.use("/api/status", statusRoutes);
-app.use("/api/control", controlRoutes);
-app.use("/api/rfid", rfidRoutes);
-app.use("/api/logs", logRoutes);
+app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
 module.exports = app;

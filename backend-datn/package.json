@@ -4,17 +4,19 @@
   "description": "IoT Smart Home Backend for graduation project",
   "main": "src/server.js",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "nodemon src/server.js"
+    "dev": "node server.js",
+    "start": "nodemon server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.1",
     "mqtt": "^5.15.0",
     "socket.io": "^4.8.3"
