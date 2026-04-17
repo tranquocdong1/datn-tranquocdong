@@ -1,10 +1,12 @@
-const mqtt = require('mqtt');
-const TOPICS = require('../config/mqtt');
-const DeviceState = require('../models/DeviceState');
-const DeviceLog = require('../models/DeviceLog');
-const socket = require('./socketService');
+const mqtt = require("mqtt");
+const TOPICS = require("../config/mqtt");
+const DeviceState = require("../models/DeviceState");
+const DeviceLog = require("../models/DeviceLog");
+const socket = require("./socketService");
+const telegram = require("./telegramService");
 
 let client;
+let lastScannedUID = "";
 
 // ─── Upsert trạng thái thiết bị ───────────────────────────────────────────
 // Thành này
@@ -12,7 +14,7 @@ const updateState = async (update) => {
   await DeviceState.findOneAndUpdate(
     {},
     { ...update, updatedAt: new Date() },
-    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
   );
 };
 
@@ -26,124 +28,133 @@ const handleMessage = async (topic, message) => {
   const msg = message.toString().trim();
 
   switch (topic) {
-
-    // ── Cửa ──────────────────────────────────────────────────────────────
     case TOPICS.DOOR_STATUS:
-      await updateState({ 'door.status': msg });
-      socket.emit('door:status', { status: msg });
+      await updateState({ "door.status": msg });
+      socket.emit("door:status", { status: msg });
       break;
-
+    // ── Cửa ──────────────────────────────────────────────────────────────
     case TOPICS.DOOR_ACCESS: {
-      const granted = msg === 'granted';
-      saveLog('door', granted ? 'access_granted' : 'access_denied', { result: msg });
-      socket.emit('door:access', { result: msg });
+      const granted = msg === "granted";
+      saveLog("door", granted ? "access_granted" : "access_denied", {
+        result: msg,
+      });
+      socket.emit("door:access", { result: msg });
+      if (granted) telegram.alerts.doorOpened(lastScannedUID || "unknown");
+      else telegram.alerts.doorDenied(lastScannedUID || "unknown");
       break;
     }
 
     case TOPICS.DOOR_UID_SCANNED:
-      saveLog('door', 'uid_scanned', { uid: msg });
-      socket.emit('door:uid_scanned', { uid: msg });
+      lastScannedUID = msg;
+      saveLog("door", "uid_scanned", { uid: msg });
+      socket.emit("door:uid_scanned", { uid: msg });
       break;
 
     case TOPICS.DOOR_UID_RESULT:
-      socket.emit('door:uid_result', { result: msg });
+      socket.emit("door:uid_result", { result: msg });
       break;
 
     case TOPICS.DOOR_UID_RESPONSE:
-      socket.emit('door:uid_response', { uids: msg });
+      socket.emit("door:uid_response", { uids: msg });
       break;
 
     // ── Giàn phơi ────────────────────────────────────────────────────────
     case TOPICS.CLOTHES_STATUS:
-      await updateState({ 'clothes.status': msg });
-      socket.emit('clothes:status', { status: msg });
+      await updateState({ "clothes.status": msg });
+      socket.emit("clothes:status", { status: msg });
       break;
 
     case TOPICS.CLOTHES_WARNING:
-      socket.emit('clothes:warning', { reason: msg });
+      socket.emit("clothes:warning", { reason: msg });
       break;
 
     // ── Mưa ──────────────────────────────────────────────────────────────
     case TOPICS.RAIN_STATUS:
-      await updateState({ 'rain.status': msg });
-      socket.emit('rain:status', { status: msg });
-      if (msg === 'raining') saveLog('rain', 'rain_detected', {});
+      await updateState({ "rain.status": msg });
+      socket.emit("rain:status", { status: msg });
+      if (msg === "raining") {
+        saveLog("rain", "rain_detected", {});
+        telegram.alerts.rainDetected();
+      } else {
+        telegram.alerts.rainCleared();
+      }
       break;
 
     // ── DHT11 ─────────────────────────────────────────────────────────────
     case TOPICS.ROOM_DHT: {
       try {
         const { temp, hum } = JSON.parse(msg);
-        await updateState({ 'room.temperature': temp, 'room.humidity': hum });
-        socket.emit('room:dht', { temp, hum });
-
-        // Lưu log nhiệt độ để vẽ chart lịch sử
-        saveLog('room', 'dht_record', { temp, hum });
-
-        if (temp >= 35) saveLog('room', 'high_temperature', { temp, hum });
-      } catch (_) { }
+        await updateState({ "room.temperature": temp, "room.humidity": hum });
+        socket.emit("room:dht", { temp, hum });
+        saveLog("room", "dht_record", { temp, hum });
+        if (temp >= 35) {
+          saveLog("room", "high_temperature", { temp, hum });
+          telegram.alerts.highTemp(temp, hum); // gửi Telegram
+        }
+      } catch (_) {}
       break;
     }
 
     // ── Khí gas ───────────────────────────────────────────────────────────
     case TOPICS.ROOM_GAS: {
       const gasVal = parseInt(msg);
-      await updateState({ 'room.gas': gasVal });
-      socket.emit('room:gas', { gas: gasVal });
-      if (gasVal === 1) saveLog('room', 'gas_detected', { value: gasVal });
+      await updateState({ "room.gas": gasVal });
+      socket.emit("room:gas", { gas: gasVal });
+      if (gasVal === 1) {
+        saveLog("room", "gas_detected", { value: gasVal });
+        telegram.alerts.gasDetected(); // gửi Telegram
+      }
       break;
     }
 
     // ── Đếm người ─────────────────────────────────────────────────────────
     case TOPICS.ROOM_PEOPLE: {
       const count = parseInt(msg);
-      await updateState({ 'room.people': count });
-      socket.emit('room:people', { count });
+      await updateState({ "room.people": count });
+      socket.emit("room:people", { count });
       break;
     }
 
     // ── Ánh sáng ──────────────────────────────────────────────────────────
     case TOPICS.ROOM_LIGHT:
-      await updateState({ 'room.light': msg });
-      socket.emit('room:light', { light: msg });
+      await updateState({ "room.light": msg });
+      socket.emit("room:light", { light: msg });
       break;
 
     // ── Buzzer ────────────────────────────────────────────────────────────
     case TOPICS.ROOM_BUZZER: {
       const buzzerVal = parseInt(msg);
-      await updateState({ 'room.buzzer': buzzerVal });
-      socket.emit('room:buzzer', { buzzer: buzzerVal });
-      if (buzzerVal === 1) saveLog('room', 'buzzer_on', {});
+      await updateState({ "room.buzzer": buzzerVal });
+      socket.emit("room:buzzer", { buzzer: buzzerVal });
+      if (buzzerVal === 1) saveLog("room", "buzzer_on", {});
       break;
     }
 
     // ── LED phòng khách ───────────────────────────────────────────────────
     case TOPICS.LIVING_LED_STATUS:
-      await updateState({ 'living.ledStatus': msg });
-      socket.emit('living:led_status', { status: msg });
+      await updateState({ "living.ledStatus": msg });
+      socket.emit("living:led_status", { status: msg });
       break;
 
     // ── LED phòng ngủ ─────────────────────────────────────────────────────
     case TOPICS.BEDROOM_LED_STATUS:
-      await updateState({ 'bedroom.ledStatus': msg });
-      socket.emit('bedroom:led_status', { status: msg });
+      await updateState({ "bedroom.ledStatus": msg });
+      socket.emit("bedroom:led_status", { status: msg });
       break;
 
     // ── Quạt ──────────────────────────────────────────────────────────────
     case TOPICS.ROOM_FAN_STATUS:
-      await updateState({ 'room.fanStatus': msg });
-      socket.emit('room:fan_status', { status: msg });
+      await updateState({ "room.fanStatus": msg });
+      socket.emit("room:fan_status", { status: msg });
       break;
 
     // ── Cảnh báo xâm nhập ─────────────────────────────────────────────────
     case TOPICS.ALERT_BUZZER:
-      if (msg === 'INTRUDER') {
-        saveLog('security', 'intruder_alert', {});
-        socket.emit('alert:intruder', {});
+      if (msg === "INTRUDER") {
+        saveLog("security", "intruder_alert", {});
+        socket.emit("alert:intruder", {});
+        telegram.alerts.intruder();
       }
-      break;
-
-    default:
       break;
   }
 };
@@ -157,37 +168,47 @@ const publish = (topic, message) => {
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 const init = (io) => {
-  client = mqtt.connect(`mqtt://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`, {
-    clientId: process.env.MQTT_CLIENT_ID,
-    username: process.env.MQTT_USER,
-    password: process.env.MQTT_PASSWORD,
-    reconnectPeriod: 3000,
-  });
+  client = mqtt.connect(
+    `mqtt://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`,
+    {
+      clientId: process.env.MQTT_CLIENT_ID,
+      username: process.env.MQTT_USER,
+      password: process.env.MQTT_PASSWORD,
+      reconnectPeriod: 3000,
+    },
+  );
 
-  client.on('connect', () => {
-    console.log('MQTT connected');
+  client.on("connect", () => {
+    console.log("MQTT connected");
     // Subscribe tất cả topic cần lắng nghe
     const subscribeTopics = [
-      TOPICS.DOOR_STATUS, TOPICS.DOOR_ACCESS,
-      TOPICS.DOOR_UID_SCANNED, TOPICS.DOOR_UID_RESULT, TOPICS.DOOR_UID_RESPONSE,
-      TOPICS.CLOTHES_STATUS, TOPICS.CLOTHES_WARNING,
+      TOPICS.DOOR_STATUS,
+      TOPICS.DOOR_ACCESS,
+      TOPICS.DOOR_UID_SCANNED,
+      TOPICS.DOOR_UID_RESULT,
+      TOPICS.DOOR_UID_RESPONSE,
+      TOPICS.CLOTHES_STATUS,
+      TOPICS.CLOTHES_WARNING,
       TOPICS.RAIN_STATUS,
-      TOPICS.ROOM_DHT, TOPICS.ROOM_GAS,
-      TOPICS.ROOM_PEOPLE, TOPICS.ROOM_LIGHT,
+      TOPICS.ROOM_DHT,
+      TOPICS.ROOM_GAS,
+      TOPICS.ROOM_PEOPLE,
+      TOPICS.ROOM_LIGHT,
       TOPICS.ROOM_BUZZER,
-      TOPICS.LIVING_LED_STATUS, TOPICS.BEDROOM_LED_STATUS,
+      TOPICS.LIVING_LED_STATUS,
+      TOPICS.BEDROOM_LED_STATUS,
       TOPICS.ROOM_FAN_STATUS,
       TOPICS.ALERT_BUZZER,
     ];
     client.subscribe(subscribeTopics, (err) => {
-      if (err) console.error('MQTT subscribe error:', err);
+      if (err) console.error("MQTT subscribe error:", err);
       else console.log(`Subscribed to ${subscribeTopics.length} topics`);
     });
   });
 
-  client.on('message', handleMessage);
-  client.on('error', (err) => console.error('MQTT error:', err));
-  client.on('offline', () => console.warn('MQTT offline'));
+  client.on("message", handleMessage);
+  client.on("error", (err) => console.error("MQTT error:", err));
+  client.on("offline", () => console.warn("MQTT offline"));
 };
 
 module.exports = { init, publish };
