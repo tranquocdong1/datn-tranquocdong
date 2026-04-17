@@ -1,5 +1,8 @@
 const jwt  = require('jsonwebtoken');
 const User = require('../models/User');
+const crypto   = require('crypto');
+const OTP      = require('../models/OTP');
+const { sendOTPEmail } = require('../services/emailService');
 
 const signToken = (user) =>
   jwt.sign(
@@ -22,15 +25,114 @@ exports.register = async (req, res) => {
   }
 };
 
-// POST /api/auth/login
+const generateOTP = () =>
+  crypto.randomInt(100000, 999999).toString();
+
+// ─── POST /api/auth/login ──────────────────────────────────────────────────
+// Bước 1: kiểm tra username/password → gửi OTP nếu 2FA bật
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
+
     const user = await User.findOne({ username });
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Sai tên đăng nhập hoặc mật khẩu!' });
     }
-    res.json({ token: signToken(user), username: user.username, role: user.role });
+
+    // Nếu tắt 2FA → trả token luôn
+    if (!user.twoFA) {
+      return res.json({
+        token:    signToken(user),
+        username: user.username,
+        role:     user.role,
+        twoFA:    false,
+      });
+    }
+
+    // Xóa OTP cũ chưa dùng của user này
+    await OTP.deleteMany({ userId: user._id });
+
+    // Tạo OTP mới
+    const otp       = generateOTP();
+    const expiresAt = new Date(
+      Date.now() + (parseInt(process.env.OTP_EXPIRES_MIN) || 5) * 60 * 1000
+    );
+
+    // Lưu OTP đã hash vào DB
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    await OTP.create({ userId: user._id, otp: otpHash, expiresAt });
+
+    // Gửi email
+    await sendOTPEmail(user.email, otp, user.username);
+
+    // Trả về userId tạm để bước 2 dùng (không trả token)
+    return res.json({
+      twoFA:   true,
+      userId:  user._id,
+      message: `Mã OTP đã gửi tới ${user.email.replace(/(.{2}).*(@.*)/, '$1***$2')}`,
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── POST /api/auth/verify-otp ────────────────────────────────────────────
+// Bước 2: nhập OTP → nhận token
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+
+    if (!userId || !otp) {
+      return res.status(400).json({ message: 'Thiếu userId hoặc OTP!' });
+    }
+
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const record  = await OTP.findOne({
+      userId,
+      otp:  otpHash,
+      used: false,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!record) {
+      return res.status(401).json({ message: 'OTP không hợp lệ hoặc đã hết hạn!' });
+    }
+
+    // Đánh dấu đã dùng
+    record.used = true;
+    await record.save();
+
+    const user = await User.findById(userId);
+    res.json({
+      token:    signToken(user),
+      username: user.username,
+      role:     user.role,
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── POST /api/auth/resend-otp ────────────────────────────────────────────
+exports.resendOTP = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User không tồn tại!' });
+
+    await OTP.deleteMany({ userId: user._id });
+
+    const otp       = generateOTP();
+    const expiresAt = new Date(
+      Date.now() + (parseInt(process.env.OTP_EXPIRES_MIN) || 5) * 60 * 1000
+    );
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    await OTP.create({ userId: user._id, otp: otpHash, expiresAt });
+    await sendOTPEmail(user.email, otp, user.username);
+
+    res.json({ message: 'Đã gửi lại OTP!' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

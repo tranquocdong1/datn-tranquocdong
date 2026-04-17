@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { login } from '../api/authApi';
 import useAuthStore from '../store/authStore';
 import { toast } from 'react-hot-toast';
-import { Home, User, Lock, ArrowRight, Wifi, Thermometer, Shield } from 'lucide-react';
+import { Home, User, Lock, ArrowRight, Wifi, Thermometer, Shield, Mail, RefreshCw } from 'lucide-react';
+import api from '../api/axios';
 
 /* ── Dot grid decoration ── */
 const DotGrid = ({ cols = 6, rows = 5, style = {} }) => (
@@ -67,24 +68,88 @@ const AmbientCard = ({ icon, label, value, top, left, right, delay = '0s' }) => 
 );
 
 const LoginPage = () => {
-  const [form, setForm]       = useState({ username: '', password: '' });
-  const [loading, setLoading] = useState(false);
+  const [step,      setStep]      = useState('login'); // 'login' | 'otp'
+  const [form,      setForm]      = useState({ username: '', password: '' });
+  const [otp,       setOtp]       = useState('');
+  const [userId,    setUserId]    = useState(null);
+  const [hint,      setHint]      = useState('');
+  const [loading,   setLoading]   = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [focusedField, setFocusedField] = useState(null);
+
   const { setToken, setUser } = useAuthStore();
   const navigate              = useNavigate();
 
+  // ── Countdown timer ───────────────────────────────────────────────────
+  const startCountdown = (seconds) => {
+    setCountdown(seconds);
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) { clearInterval(interval); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const formatTime = (s) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  // ── Bước 1: Login ──────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await login(form);
+
+      if (!res.data.twoFA) {
+        // Không có 2FA → vào thẳng
+        setToken(res.data.token);
+        setUser({ username: res.data.username, role: res.data.role });
+        navigate('/dashboard');
+        return;
+      }
+
+      // Có 2FA → chuyển sang bước nhập OTP
+      setUserId(res.data.userId);
+      setHint(res.data.message);
+      setStep('otp');
+      startCountdown(300); // 5 phút
+      toast.success('Đã gửi mã OTP!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Sai tên đăng nhập hoặc mật khẩu!');
+      console.error("Chi tiết lỗi API:", err.response?.data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Bước 2: Xác thực OTP ──────────────────────────────────────────────
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    if (otp.length !== 6) return toast.error('OTP phải đủ 6 số!');
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/verify-otp', { userId, otp });
       setToken(res.data.token);
       setUser({ username: res.data.username, role: res.data.role });
       navigate('/dashboard');
-    } catch {
-      toast.error('Sai tên đăng nhập hoặc mật khẩu!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'OTP không hợp lệ!');
+      setOtp('');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Gửi lại OTP ───────────────────────────────────────────────────────
+  const handleResend = async () => {
+    if (countdown > 0) return;
+    try {
+      await api.post('/auth/resend-otp', { userId });
+      toast.success('Đã gửi lại OTP!');
+      startCountdown(300);
+    } catch {
+      toast.error('Gửi lại thất bại!');
     }
   };
 
@@ -108,6 +173,10 @@ const LoginPage = () => {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+        @keyframes slideLeft {
+          from { opacity: 0; transform: translateX(24px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
 
         .login-input {
           width: 100%;
@@ -124,6 +193,29 @@ const LoginPage = () => {
         }
         .login-input::placeholder { color: #B8B6B0; }
         .login-input:focus {
+          border-color: #EF9F27;
+          background: #fff;
+          box-shadow: 0 0 0 3px rgba(239,159,39,0.12);
+        }
+
+        .otp-input {
+          width: 100%;
+          padding: 16px 14px;
+          border-radius: 12px;
+          border: 1.5px solid #EEECE8;
+          background: #FAF8F4;
+          font-size: 30px;
+          font-weight: 700;
+          letter-spacing: 14px;
+          text-align: center;
+          font-family: 'Inter', system-ui, sans-serif;
+          color: #EF9F27;
+          outline: none;
+          transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+        }
+        .otp-input::placeholder { color: #D8D6D0; letter-spacing: 10px; font-size: 20px; }
+        .otp-input:focus {
           border-color: #EF9F27;
           background: #fff;
           box-shadow: 0 0 0 3px rgba(239,159,39,0.12);
@@ -162,6 +254,40 @@ const LoginPage = () => {
           cursor: not-allowed;
         }
 
+        .back-btn {
+          width: 100%;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1.5px solid #EEECE8;
+          background: #FAF8F4;
+          color: #888780;
+          font-size: 13px;
+          font-family: 'Inter', system-ui, sans-serif;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: border-color 0.2s, background 0.2s;
+          margin-top: 10px;
+        }
+        .back-btn:hover {
+          border-color: #D8D6D0;
+          background: #F0EDE8;
+          color: #444340;
+        }
+
+        .resend-btn {
+          background: none;
+          border: none;
+          padding: 0;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: 'Inter', system-ui, sans-serif;
+          text-decoration: underline;
+          transition: color 0.2s;
+        }
+
         .spinner {
           width: 16px;
           height: 16px;
@@ -177,6 +303,18 @@ const LoginPage = () => {
         .card-animate-delay-1 { animation-delay: 0.1s; opacity: 0; }
         .card-animate-delay-2 { animation-delay: 0.2s; opacity: 0; }
         .card-animate-delay-3 { animation-delay: 0.3s; opacity: 0; }
+
+        .otp-animate {
+          animation: slideLeft 0.4s ease forwards;
+        }
+
+        /* Step indicator connector */
+        .step-connector {
+          flex: 1;
+          height: 2px;
+          margin-bottom: 20px;
+          transition: background 0.4s;
+        }
       `}</style>
 
       <div style={{
@@ -194,7 +332,6 @@ const LoginPage = () => {
           position: 'relative',
           background: 'linear-gradient(145deg, #FFF8EE 0%, #FFF0D0 50%, #FAE8B0 100%)',
           overflow: 'hidden',
-          // Show on larger screens via media query workaround:
           ...(typeof window !== 'undefined' && window.innerWidth >= 900
             ? { display: 'flex', alignItems: 'center', justifyContent: 'center' }
             : {}),
@@ -321,7 +458,7 @@ const LoginPage = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 12,
-              marginBottom: 36,
+              marginBottom: 28,
             }}>
               <div style={{
                 width: 44,
@@ -342,8 +479,58 @@ const LoginPage = () => {
               </div>
             </div>
 
+            {/* ── Step indicator ── */}
+            <div className="card-animate card-animate-delay-1" style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: 24,
+            }}>
+              {['Đăng nhập', 'Xác thực OTP'].map((label, i) => {
+                const active = (i === 0 && step === 'login') || (i === 1 && step === 'otp');
+                const done   = i === 0 && step === 'otp';
+                return (
+                  <div key={label} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                      <div style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: done ? '#52A843' : active ? '#EF9F27' : '#EEECE8',
+                        color: done || active ? '#fff' : '#B8B6B0',
+                        transition: 'all 0.35s',
+                        boxShadow: active ? '0 2px 10px rgba(239,159,39,0.35)' : done ? '0 2px 10px rgba(82,168,67,0.3)' : 'none',
+                      }}>
+                        {done ? '✓' : i + 1}
+                      </div>
+                      <span style={{
+                        fontSize: 10,
+                        marginTop: 4,
+                        color: active ? '#EF9F27' : done ? '#52A843' : '#B8B6B0',
+                        fontWeight: active ? 600 : 400,
+                        letterSpacing: '0.03em',
+                        textTransform: 'uppercase',
+                        transition: 'color 0.35s',
+                      }}>
+                        {label}
+                      </span>
+                    </div>
+                    {i === 0 && (
+                      <div className="step-connector" style={{
+                        background: step === 'otp' ? '#52A843' : '#EEECE8',
+                      }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Heading */}
-            <div className="card-animate card-animate-delay-2" style={{ marginBottom: 28 }}>
+            <div className="card-animate card-animate-delay-2" style={{ marginBottom: 24 }}>
               <h1 style={{
                 fontSize: 26,
                 fontWeight: 300,
@@ -352,113 +539,241 @@ const LoginPage = () => {
                 letterSpacing: '-0.02em',
                 lineHeight: 1.2,
               }}>
-                Chào mừng trở lại
+                {step === 'login' ? 'Chào mừng trở lại' : 'Xác thực 2 lớp'}
               </h1>
               <p style={{ fontSize: 13, color: '#888780', margin: 0, lineHeight: 1.6 }}>
-                Đăng nhập để quản lý ngôi nhà của bạn
+                {step === 'login'
+                  ? 'Đăng nhập để quản lý ngôi nhà của bạn'
+                  : 'Nhập mã OTP được gửi đến email của bạn'}
               </p>
             </div>
 
-            {/* Form */}
-            <form
-              onSubmit={handleSubmit}
-              className="card-animate card-animate-delay-3"
-            >
-              {/* Username field */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: '#444340',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  marginBottom: 8,
-                }}>
-                  Tên đăng nhập
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: 14,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: focusedField === 'username' ? '#EF9F27' : '#B8B6B0',
-                    transition: 'color 0.2s',
-                    pointerEvents: 'none',
-                    display: 'flex',
+            {/* ── Form login ── */}
+            {step === 'login' && (
+              <form
+                onSubmit={handleSubmit}
+                className="card-animate card-animate-delay-3"
+              >
+                {/* Username field */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: '#444340',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
                   }}>
-                    <User size={16} strokeWidth={1.5} />
+                    Tên đăng nhập
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 14,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: focusedField === 'username' ? '#EF9F27' : '#B8B6B0',
+                      transition: 'color 0.2s',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                    }}>
+                      <User size={16} strokeWidth={1.5} />
+                    </div>
+                    <input
+                      className="login-input"
+                      type="text"
+                      placeholder="Nhập tên đăng nhập"
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                      onFocus={() => setFocusedField('username')}
+                      onBlur={() => setFocusedField(null)}
+                      required
+                      autoComplete="username"
+                    />
                   </div>
+                </div>
+
+                {/* Password field */}
+                <div style={{ marginBottom: 28 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: '#444340',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                  }}>
+                    Mật khẩu
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 14,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: focusedField === 'password' ? '#EF9F27' : '#B8B6B0',
+                      transition: 'color 0.2s',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                    }}>
+                      <Lock size={16} strokeWidth={1.5} />
+                    </div>
+                    <input
+                      className="login-input"
+                      type="password"
+                      placeholder="Nhập mật khẩu"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      onFocus={() => setFocusedField('password')}
+                      onBlur={() => setFocusedField(null)}
+                      required
+                      autoComplete="current-password"
+                    />
+                  </div>
+                </div>
+
+                {/* Submit button */}
+                <button type="submit" disabled={loading} className="login-btn">
+                  {loading ? (
+                    <>
+                      <span className="spinner" />
+                      Đang đăng nhập...
+                    </>
+                  ) : (
+                    <>
+                      Tiếp tục
+                      <ArrowRight size={16} strokeWidth={2} />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* ── Form OTP ── */}
+            {step === 'otp' && (
+              <form onSubmit={handleVerifyOTP} className="otp-animate">
+
+                {/* Email hint */}
+                <div style={{
+                  background: '#FFF8EE',
+                  border: '1px solid #FAE8B8',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  marginBottom: 20,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                }}>
+                  <div style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    background: '#FFF3DC',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#EF9F27',
+                    flexShrink: 0,
+                    marginTop: 1,
+                  }}>
+                    <Mail size={14} strokeWidth={1.5} />
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: '#BA7517', lineHeight: 1.5 }}>
+                    {hint}
+                  </p>
+                </div>
+
+                {/* OTP input */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: '#444340',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                  }}>
+                    Nhập mã OTP (6 số)
+                  </label>
                   <input
-                    className="login-input"
+                    className="otp-input"
                     type="text"
-                    placeholder="Nhập tên đăng nhập"
-                    value={form.username}
-                    onChange={(e) => setForm({ ...form, username: e.target.value })}
-                    onFocus={() => setFocusedField('username')}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="— — — — — —"
+                    maxLength={6}
+                    autoFocus
+                    onFocus={() => setFocusedField('otp')}
                     onBlur={() => setFocusedField(null)}
-                    required
-                    autoComplete="username"
                   />
                 </div>
-              </div>
 
-              {/* Password field */}
-              <div style={{ marginBottom: 28 }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: '#444340',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  marginBottom: 8,
+                {/* Countdown & Resend */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 24,
                 }}>
-                  Mật khẩu
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: 14,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: focusedField === 'password' ? '#EF9F27' : '#B8B6B0',
-                    transition: 'color 0.2s',
-                    pointerEvents: 'none',
-                    display: 'flex',
+                  <span style={{
+                    fontSize: 12,
+                    color: countdown > 0 ? '#EF9F27' : '#C4533A',
+                    fontWeight: 500,
                   }}>
-                    <Lock size={16} strokeWidth={1.5} />
-                  </div>
-                  <input
-                    className="login-input"
-                    type="password"
-                    placeholder="Nhập mật khẩu"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField(null)}
-                    required
-                    autoComplete="current-password"
-                  />
+                    {countdown > 0
+                      ? `⏱ Hết hạn sau: ${formatTime(countdown)}`
+                      : '⚠️ OTP đã hết hạn'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={countdown > 0}
+                    className="resend-btn"
+                    style={{
+                      color: countdown > 0 ? '#B8B6B0' : '#EF9F27',
+                      cursor: countdown > 0 ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <RefreshCw size={11} strokeWidth={2} />
+                    Gửi lại OTP
+                  </button>
                 </div>
-              </div>
 
-              {/* Submit button */}
-              <button type="submit" disabled={loading} className="login-btn">
-                {loading ? (
-                  <>
-                    <span className="spinner" />
-                    Đang đăng nhập...
-                  </>
-                ) : (
-                  <>
-                    Đăng nhập
-                    <ArrowRight size={16} strokeWidth={2} />
-                  </>
-                )}
-              </button>
-            </form>
+                {/* Verify button */}
+                <button
+                  type="submit"
+                  disabled={loading || otp.length < 6}
+                  className="login-btn"
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner" />
+                      Đang xác thực...
+                    </>
+                  ) : (
+                    <>
+                      <Shield size={16} strokeWidth={1.5} />
+                      Xác thực
+                    </>
+                  )}
+                </button>
+
+                {/* Quay lại */}
+                <button
+                  type="button"
+                  onClick={() => { setStep('login'); setOtp(''); }}
+                  className="back-btn"
+                >
+                  ← Quay lại đăng nhập
+                </button>
+              </form>
+            )}
 
             {/* Status indicators */}
             <div style={{

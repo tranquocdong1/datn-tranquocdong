@@ -13,6 +13,7 @@ const User     = require('../models/User');
 
   await User.create({
     username: 'admin',
+    email:    'tranquocdong10.2@gmail.com',
     password: '123456',
     role:     'admin',
   });
