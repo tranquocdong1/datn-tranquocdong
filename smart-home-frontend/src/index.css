@@ -245,3 +245,26 @@ button { cursor: pointer; font-family: inherit; }
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.65; }
 }
+
+[data-theme="dark"] {
+  --bg-base:        #1A1917;
+  --bg-card:        #242220;
+  --bg-sidebar:     #1E1C1A;
+  --bg-muted:       #1E1C1A;
+
+  --accent-primary: #EF9F27;
+  --accent-light:   #FAC775;
+  --accent-pale:    #2A2115;
+  --accent-pale-border: #3D2E10;
+
+  --text-heading:   #F0EDE8;
+  --text-body:      #C8C5BF;
+  --text-muted:     #888780;
+  --text-hint:      #555350;
+
+  --border-default: #2E2C28;
+  --border-strong:  #3A3835;
+
+  --shadow-card:    0 2px 12px rgba(0, 0, 0, 0.25);
+  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.35);
+}

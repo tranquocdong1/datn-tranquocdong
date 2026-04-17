@@ -3,6 +3,7 @@ import { LogOut, AlertTriangle, Bell, Mic } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useDeviceStore from '../../store/deviceStore';
 import { useState, useRef } from 'react';
+import ThemeToggle from '../ui/ThemeToggle';
 
 // API
 import { sendDoorCmd } from '../../api/doorApi';
@@ -207,6 +208,10 @@ const Navbar = () => {
 
       {/* RIGHT */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+        <ThemeToggle />
+
+        <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
         
         {/* 🎤 VOICE */}
         <button

@@ -27,9 +27,9 @@ const DotGrid = ({ cols = 6, rows = 4, style = {} }) => (
 
 /* ── Section header ── */
 const SectionHeader = ({ title, sub }) => (
-  <div style={{ marginBottom: 'var(--space-lg, 16px)' }}>
-    <h2 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-heading, #1A1A1A)', margin: 0 }}>{title}</h2>
-    {sub && <p style={{ fontSize: 11, color: 'var(--text-muted, #888780)', marginTop: 2, margin: 0 }}>{sub}</p>}
+  <div style={{ marginBottom: 'var(--space-lg)' }}>
+    <h2 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-heading)', margin: 0 }}>{title}</h2>
+    {sub && <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>{sub}</p>}
   </div>
 );
 
@@ -40,7 +40,7 @@ const Pill = ({ color = 'amber', children }) => {
     green:  { bg: '#EAFCE8', text: '#3B6D11' },
     blue:   { bg: '#E6F1FB', text: '#185FA5' },
     purple: { bg: '#EEEDFE', text: '#534AB7' },
-    gray:   { bg: '#FAF8F4', text: '#888780' },
+    gray:   { bg: 'var(--bg-muted)', text: 'var(--text-muted)' },
     red:    { bg: '#FCEBEB', text: '#A32D2D' },
   };
   const { bg, text } = map[color] || map.gray;
@@ -70,10 +70,6 @@ const ServoArc = ({ position }) => {
     y: cy + r * Math.sin(angle),
   });
 
-  const bgStart = toXY(start);
-  const bgEnd   = toXY(end);
-  const fillEnd = toXY(start + total * pct);
-
   const arcPath = (from, to, sweep) => {
     const f = toXY(from);
     const t = toXY(to);
@@ -86,7 +82,7 @@ const ServoArc = ({ position }) => {
       <path
         d={arcPath(start, end, 1)}
         fill="none"
-        stroke="#EEECE8"
+        stroke="var(--border-default)"
         strokeWidth={8}
         strokeLinecap="round"
       />
@@ -105,7 +101,7 @@ const ServoArc = ({ position }) => {
         textAnchor="middle"
         fontSize={13}
         fontWeight={500}
-        fill="#1A1A1A"
+        fill="var(--text-heading)"
         fontFamily="Inter, system-ui, sans-serif"
       >
         {position === 'out' ? 'Mở' : 'Đóng'}
@@ -133,8 +129,8 @@ const CtrlBtn = ({ icon, label, sub, accent = 'amber', onClick, disabled, loadin
         gap: 14,
         padding: '14px 18px',
         borderRadius: 14,
-        border: `1px solid ${disabled ? '#EEECE8' : border}`,
-        background: disabled ? '#FAF8F4' : light,
+        border: `1px solid ${disabled ? 'var(--border-default)' : border}`,
+        background: disabled ? 'var(--bg-muted)' : light,
         cursor: disabled || loading ? 'not-allowed' : 'pointer',
         width: '100%',
         textAlign: 'left',
@@ -156,16 +152,16 @@ const CtrlBtn = ({ icon, label, sub, accent = 'amber', onClick, disabled, loadin
           e.currentTarget.style.background = light;
           e.currentTarget.style.borderColor = border;
           e.currentTarget.querySelector('.btn-icon').style.color = text;
-          e.currentTarget.querySelector('.btn-label').style.color = '#1A1A1A';
-          e.currentTarget.querySelector('.btn-sub').style.color = '#888780';
+          e.currentTarget.querySelector('.btn-label').style.color = 'var(--text-heading)';
+          e.currentTarget.querySelector('.btn-sub').style.color = 'var(--text-muted)';
         }
       }}
     >
       <div className="btn-icon" style={{
         width: 38, height: 38, borderRadius: 11,
-        background: 'rgba(255,255,255,0.7)',
+        background: 'rgba(255,255,255,0.1)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: disabled ? '#B8B6B0' : text,
+        color: disabled ? 'var(--text-hint)' : text,
         flexShrink: 0,
         transition: 'color 0.18s',
       }}>
@@ -183,13 +179,13 @@ const CtrlBtn = ({ icon, label, sub, accent = 'amber', onClick, disabled, loadin
       <div>
         <div className="btn-label" style={{
           fontSize: 13, fontWeight: 500,
-          color: disabled ? '#B8B6B0' : '#1A1A1A',
+          color: disabled ? 'var(--text-hint)' : 'var(--text-heading)',
           transition: 'color 0.18s',
         }}>
           {label}
         </div>
         <div className="btn-sub" style={{
-          fontSize: 11, color: disabled ? '#D0CEC8' : '#888780',
+          fontSize: 11, color: disabled ? 'var(--text-hint)' : 'var(--text-muted)',
           marginTop: 2, transition: 'color 0.18s',
         }}>
           {sub}
@@ -204,10 +200,10 @@ const InfoRow = ({ label, value, accent = false }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '10px 0',
-    borderBottom: '1px solid #EEECE8',
+    borderBottom: '1px solid var(--border-default)',
   }}>
-    <span style={{ fontSize: 12, color: '#888780' }}>{label}</span>
-    <span style={{ fontSize: 12, fontWeight: 500, color: accent ? '#EF9F27' : '#1A1A1A' }}>{value}</span>
+    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</span>
+    <span style={{ fontSize: 12, fontWeight: 500, color: accent ? '#EF9F27' : 'var(--text-heading)' }}>{value}</span>
   </div>
 );
 
@@ -248,10 +244,10 @@ const ClothesPage = () => {
         {/* ── Page header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 300, color: '#1A1A1A', margin: 0, letterSpacing: '-0.01em' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 300, color: 'var(--text-heading)', margin: 0, letterSpacing: '-0.01em' }}>
               Giàn phơi thông minh
             </h1>
-            <p style={{ fontSize: 12, color: '#B8B6B0', marginTop: 3 }}>Servo motor · Cảm biến mưa tự động</p>
+            <p style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 3 }}>Servo motor · Cảm biến mưa tự động</p>
           </div>
           <Pill color={isRaining ? 'blue' : 'green'}>
             <span style={{
@@ -283,10 +279,10 @@ const ClothesPage = () => {
           {/* Status card */}
           <div style={{
             flex: 1, minWidth: 260,
-            background: '#fff',
+            background: 'var(--bg-card)',
             borderRadius: 20,
-            border: '1px solid #EEECE8',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            border: '1px solid var(--border-default)',
+            boxShadow: 'var(--shadow-card)',
             padding: 24,
             position: 'relative',
             overflow: 'hidden',
@@ -297,10 +293,8 @@ const ClothesPage = () => {
 
             {/* Big status display */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 24px' }}>
-              {/* Arc gauge */}
               <ServoArc position={isClothesIn ? 'in' : 'out'} />
 
-              {/* Main icon */}
               <div style={{
                 width: 64, height: 64, borderRadius: 20,
                 background: isRaining ? '#E6F1FB' : isClothesIn ? '#FFF3DC' : '#EAFCE8',
@@ -317,10 +311,10 @@ const ClothesPage = () => {
                 }
               </div>
 
-              <div style={{ fontSize: 17, fontWeight: 500, color: '#1A1A1A', marginBottom: 6, textAlign: 'center' }}>
+              <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text-heading)', marginBottom: 6, textAlign: 'center' }}>
                 {isRaining ? 'Đang có mưa' : isClothesIn ? 'Giàn đã thu vào' : 'Đang phơi ngoài'}
               </div>
-              <div style={{ fontSize: 12, color: '#888780', textAlign: 'center', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
                 {isRaining
                   ? 'Hệ thống tự động thu giàn phơi để bảo vệ quần áo'
                   : isClothesIn
@@ -350,10 +344,10 @@ const ClothesPage = () => {
           {/* Control card */}
           <div style={{
             flex: 1, minWidth: 260,
-            background: '#fff',
+            background: 'var(--bg-card)',
             borderRadius: 20,
-            border: '1px solid #EEECE8',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            border: '1px solid var(--border-default)',
+            boxShadow: 'var(--shadow-card)',
             padding: 24,
           }}>
             <SectionHeader title="Điều khiển thủ công" sub="Gửi lệnh trực tiếp đến servo motor" />
@@ -391,14 +385,18 @@ const ClothesPage = () => {
               marginTop: 20,
               padding: '12px 14px',
               borderRadius: 12,
-              background: '#FAF8F4',
-              border: '1px solid #EEECE8',
+              background: 'var(--bg-muted)',
+              border: '1px solid var(--border-default)',
             }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#888780', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 500,
+                color: 'var(--text-muted)',
+                letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6,
+              }}>
                 Lưu ý
               </div>
-              <p style={{ fontSize: 12, color: '#888780', margin: 0, lineHeight: 1.7 }}>
-                Chế độ <strong style={{ color: '#444340' }}>AUTO</strong> sẽ tự động thu giàn khi phát hiện mưa và đẩy ra khi trời quang. Lệnh thủ công sẽ ghi đè tạm thời.
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.7 }}>
+                Chế độ <strong style={{ color: 'var(--text-body)' }}>AUTO</strong> sẽ tự động thu giàn khi phát hiện mưa và đẩy ra khi trời quang. Lệnh thủ công sẽ ghi đè tạm thời.
               </p>
             </div>
           </div>
@@ -439,16 +437,16 @@ const ClothesPage = () => {
                 amber:  { bg: '#FFF3DC', border: '#FAE8B8', iconColor: '#EF9F27' },
                 green:  { bg: '#EAFCE8', border: '#C0DD97', iconColor: '#3B6D11' },
                 blue:   { bg: '#E6F1FB', border: '#B5D4F4', iconColor: '#185FA5' },
-                gray:   { bg: '#FAF8F4', border: '#EEECE8', iconColor: '#888780' },
+                gray:   { bg: 'var(--bg-muted)', border: 'var(--border-default)', iconColor: 'var(--text-muted)' },
               };
               const { bg, border, iconColor } = colorMap[color] || colorMap.gray;
               return (
                 <div key={label} style={{
                   flex: 1, minWidth: 140,
-                  background: '#fff',
+                  background: 'var(--bg-card)',
                   borderRadius: 16,
-                  border: '1px solid #EEECE8',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                  border: '1px solid var(--border-default)',
+                  boxShadow: 'var(--shadow-card)',
                   padding: '16px 18px',
                   display: 'flex',
                   alignItems: 'center',
@@ -463,8 +461,16 @@ const ClothesPage = () => {
                     {icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 500, color: '#B8B6B0', letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A', marginTop: 2 }}>{value}</div>
+                    <div style={{
+                      fontSize: 10, fontWeight: 500,
+                      color: 'var(--text-hint)',
+                      letterSpacing: '0.07em', textTransform: 'uppercase',
+                    }}>
+                      {label}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-heading)', marginTop: 2 }}>
+                      {value}
+                    </div>
                   </div>
                 </div>
               );
