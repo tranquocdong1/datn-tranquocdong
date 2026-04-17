@@ -8,11 +8,25 @@ import DoorPage from "./pages/DoorPage";
 import RoomPage from "./pages/RoomPage";
 import ClothesPage from "./pages/ClothesPage";
 import LogsPage from "./pages/LogsPage";
+// Đảm bảo file này được import trong main.jsx hoặc App.jsx:
+// import "./index.css"
 
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#fff",
+            color: "#1A1A1A",
+            border: "1px solid #EEECE8",
+            borderRadius: "12px",
+            fontSize: "13px",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.09)",
+          },
+        }}
+      />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
