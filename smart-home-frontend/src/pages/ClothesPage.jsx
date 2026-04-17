@@ -101,15 +101,6 @@ const ServoArc = ({ position }) => {
       />
       {/* Center label */}
       <text
-        x={cx} y={cy - 6}
-        textAnchor="middle"
-        fontSize={11}
-        fill="#888780"
-        fontFamily="Inter, system-ui, sans-serif"
-      >
-        Servo
-      </text>
-      <text
         x={cx} y={cy + 12}
         textAnchor="middle"
         fontSize={13}
@@ -119,10 +110,6 @@ const ServoArc = ({ position }) => {
       >
         {position === 'out' ? 'Mở' : 'Đóng'}
       </text>
-      {/* Left label */}
-      <text x={14} y={108} fontSize={9} fill="#B8B6B0" fontFamily="Inter, sans-serif">VÀO</text>
-      {/* Right label */}
-      <text x={108} y={108} fontSize={9} fill="#B8B6B0" fontFamily="Inter, sans-serif">RA</text>
     </svg>
   );
 };
