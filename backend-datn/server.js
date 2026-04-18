@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 5000;
 
   const server = http.createServer(app);
 
-  // Khởi tạo Socket.IO (truyền server vào)
   const io = socketService.init(server);
 
   // Khởi tạo MQTT (truyền io vào để emit realtime)
@@ -24,8 +23,7 @@ const PORT = process.env.PORT || 5000;
   // Truyền mqttService và TOPICS vào Telegram để nút bấm gửi được MQTT
   telegramService.initCallbacks(mqttService, TOPICS);
 
-  // Khởi động cron báo cáo hàng ngày
-  cronService.init();
+  cronService.init(mqttService);
 
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

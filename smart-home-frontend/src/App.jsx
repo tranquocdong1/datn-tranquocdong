@@ -7,9 +7,8 @@ import DashboardPage from "./pages/DashboardPage";
 import DoorPage from "./pages/DoorPage";
 import RoomPage from "./pages/RoomPage";
 import ClothesPage from "./pages/ClothesPage";
+import SchedulePage from './pages/SchedulePage';
 import LogsPage from "./pages/LogsPage";
-// Đảm bảo file này được import trong main.jsx hoặc App.jsx:
-// import "./index.css"
 
 function App() {
   return (
@@ -42,6 +41,7 @@ function App() {
           <Route path="door" element={<DoorPage />} />
           <Route path="room" element={<RoomPage />} />
           <Route path="clothes" element={<ClothesPage />} />
+          <Route path="schedules" element={<SchedulePage />} />
           <Route path="logs" element={<LogsPage />} />
         </Route>
       </Routes>

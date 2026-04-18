@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, DoorOpen, Thermometer, Wind, History,
+  LayoutDashboard, DoorOpen, Thermometer, Wind, History, Clock
 } from 'lucide-react';
 
 const links = [
@@ -8,6 +8,7 @@ const links = [
   { to: '/door',      label: 'Cửa & Thẻ', icon: DoorOpen        },
   { to: '/room',      label: 'Phòng',      icon: Thermometer     },
   { to: '/clothes',   label: 'Giàn phơi',  icon: Wind            },
+  { to: '/schedules', label: 'Hẹn giờ',      icon: Clock           },
   { to: '/logs',      label: 'Lịch sử',    icon: History         },
 ];
 
