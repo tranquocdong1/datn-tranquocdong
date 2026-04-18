@@ -33,10 +33,10 @@ exports.livingLedCmd = (req, res) => {
   res.json({ message: `Living LED ${cmd} sent` });
 };
 
-// POST /api/room/bedroom/led  — body: { cmd: "ON" | "OFF" | "AUTO" }
+// POST /api/room/bedroom/led  — body: { cmd: "ON" | "OFF" }
 exports.bedroomLedCmd = (req, res) => {
   const { cmd } = req.body;
-  if (!['ON', 'OFF', 'AUTO'].includes(cmd)) {
+  if (!['ON', 'OFF'].includes(cmd)) { // ← bỏ 'AUTO'
     return res.status(400).json({ message: 'Invalid command' });
   }
   mqtt.publish(TOPICS.BEDROOM_LED_CMD, cmd);
