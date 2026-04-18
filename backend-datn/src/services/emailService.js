@@ -8,6 +8,20 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ─── Generic alert/notification sender ────────────────────────────────────
+// Dùng cho mqttService, cronService, v.v.
+// Params: { to?, subject, html }
+// `to` mặc định là EMAIL_USER nếu không truyền
+const sendEmail = async ({ to, subject, html }) => {
+  await transporter.sendMail({
+    from:    process.env.EMAIL_FROM,
+    to:      to || process.env.EMAIL_USER,
+    subject,
+    html,
+  });
+};
+
+// ─── OTP email ────────────────────────────────────────────────────────────
 const sendOTPEmail = async (toEmail, otp, username) => {
   const expiresMin = process.env.OTP_EXPIRES_MIN || 5;
 
@@ -50,4 +64,4 @@ const sendOTPEmail = async (toEmail, otp, username) => {
   });
 };
 
-module.exports = { sendOTPEmail };
+module.exports = { sendEmail, sendOTPEmail };

@@ -3,13 +3,12 @@ const TOPICS = require("../config/mqtt");
 const DeviceState = require("../models/DeviceState");
 const DeviceLog = require("../models/DeviceLog");
 const socket = require("./socketService");
-const telegram = require("./telegramService");
+const { sendEmail } = require("./emailService");
 
 let client;
 let lastScannedUID = "";
 
 // ─── Upsert trạng thái thiết bị ───────────────────────────────────────────
-// Thành này
 const updateState = async (update) => {
   await DeviceState.findOneAndUpdate(
     {},
@@ -23,6 +22,34 @@ const saveLog = (device, event, payload) => {
   DeviceLog.create({ device, event, payload }).catch(console.error);
 };
 
+// ─── Template email cảnh báo ──────────────────────────────────────────────
+const alertEmail = ({ icon, title, rows }) => `
+  <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;
+              background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0">
+    <div style="text-align:center;margin-bottom:24px">
+      <h2 style="margin:0;color:#1e293b">🏠 Smart Home</h2>
+      <p style="color:#64748b;font-size:13px;margin-top:6px">${icon} ${title}</p>
+    </div>
+    <table style="width:100%;font-size:14px;color:#334155;border-collapse:collapse">
+      ${rows
+        .map(
+          ([label, value, highlight]) => `
+        <tr${highlight ? ' style="background:#fef2f2"' : ""}>
+          <td style="padding:8px 12px;color:#64748b">${label}</td>
+          <td style="padding:8px 12px;font-weight:700;text-align:right;
+                     ${highlight ? "color:#ef4444" : ""}">${value}</td>
+        </tr>
+      `,
+        )
+        .join("")}
+    </table>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
+    <p style="color:#94a3b8;font-size:11px;text-align:center">
+      Email tự động từ hệ thống Smart Home. Vui lòng không trả lời.
+    </p>
+  </div>
+`;
+
 // ─── Xử lý từng topic ─────────────────────────────────────────────────────
 const handleMessage = async (topic, message) => {
   const msg = message.toString().trim();
@@ -32,6 +59,7 @@ const handleMessage = async (topic, message) => {
       await updateState({ "door.status": msg });
       socket.emit("door:status", { status: msg });
       break;
+
     // ── Cửa ──────────────────────────────────────────────────────────────
     case TOPICS.DOOR_ACCESS: {
       const granted = msg === "granted";
@@ -39,8 +67,34 @@ const handleMessage = async (topic, message) => {
         result: msg,
       });
       socket.emit("door:access", { result: msg });
-      if (granted) telegram.alerts.doorOpened(lastScannedUID || "unknown");
-      else telegram.alerts.doorDenied(lastScannedUID || "unknown");
+
+      if (granted) {
+        sendEmail({
+          subject: "🚪 Cửa chính đã được mở",
+          html: alertEmail({
+            icon: "✅",
+            title: "Truy cập thành công",
+            rows: [
+              ["Trạng thái", "Đã mở cửa"],
+              ["UID thẻ", lastScannedUID || "unknown"],
+              ["Thời gian", new Date().toLocaleString("vi-VN")],
+            ],
+          }),
+        }).catch(console.error);
+      } else {
+        sendEmail({
+          subject: "🚫 Thẻ bị từ chối – Smart Home",
+          html: alertEmail({
+            icon: "❌",
+            title: "Truy cập bị từ chối",
+            rows: [
+              ["Trạng thái", "Từ chối", true],
+              ["UID thẻ", lastScannedUID || "unknown", true],
+              ["Thời gian", new Date().toLocaleString("vi-VN")],
+            ],
+          }),
+        }).catch(console.error);
+      }
       break;
     }
 
@@ -74,9 +128,30 @@ const handleMessage = async (topic, message) => {
       socket.emit("rain:status", { status: msg });
       if (msg === "raining") {
         saveLog("rain", "rain_detected", {});
-        telegram.alerts.rainDetected();
+        sendEmail({
+          subject: "🌧️ Cảnh báo: Trời đang mưa!",
+          html: alertEmail({
+            icon: "🌧️",
+            title: "Phát hiện mưa",
+            rows: [
+              ["Trạng thái", "Đang mưa", true],
+              ["Thời gian", new Date().toLocaleString("vi-VN")],
+              ["Lưu ý", "Giàn phơi sẽ tự động thu vào"],
+            ],
+          }),
+        }).catch(console.error);
       } else {
-        telegram.alerts.rainCleared();
+        sendEmail({
+          subject: "☀️ Thông báo: Trời đã tạnh mưa",
+          html: alertEmail({
+            icon: "☀️",
+            title: "Mưa đã dừng",
+            rows: [
+              ["Trạng thái", "Tạnh mưa"],
+              ["Thời gian", new Date().toLocaleString("vi-VN")],
+            ],
+          }),
+        }).catch(console.error);
       }
       break;
 
@@ -89,7 +164,19 @@ const handleMessage = async (topic, message) => {
         saveLog("room", "dht_record", { temp, hum });
         if (temp >= 35) {
           saveLog("room", "high_temperature", { temp, hum });
-          telegram.alerts.highTemp(temp, hum); // gửi Telegram
+          sendEmail({
+            subject: `🌡️ Cảnh báo nhiệt độ cao: ${temp}°C`,
+            html: alertEmail({
+              icon: "🌡️",
+              title: "Nhiệt độ cao bất thường",
+              rows: [
+                ["Nhiệt độ", `${temp} °C`, true],
+                ["Độ ẩm", `${hum} %`],
+                ["Thời gian", new Date().toLocaleString("vi-VN")],
+                ["Lưu ý", "Vui lòng kiểm tra và bật điều hòa/quạt"],
+              ],
+            }),
+          }).catch(console.error);
         }
       } catch (_) {}
       break;
@@ -102,7 +189,18 @@ const handleMessage = async (topic, message) => {
       socket.emit("room:gas", { gas: gasVal });
       if (gasVal === 1) {
         saveLog("room", "gas_detected", { value: gasVal });
-        telegram.alerts.gasDetected(); // gửi Telegram
+        sendEmail({
+          subject: "💨 KHẨN: Phát hiện khí gas rò rỉ!",
+          html: alertEmail({
+            icon: "⚠️",
+            title: "Phát hiện khí gas rò rỉ",
+            rows: [
+              ["Trạng thái", "Nguy hiểm – Gas rò rỉ", true],
+              ["Thời gian", new Date().toLocaleString("vi-VN"), true],
+              ["Hành động", "Tắt nguồn gas và thông gió ngay!", true],
+            ],
+          }),
+        }).catch(console.error);
       }
       break;
     }
@@ -153,7 +251,22 @@ const handleMessage = async (topic, message) => {
       if (msg === "INTRUDER") {
         saveLog("security", "intruder_alert", {});
         socket.emit("alert:intruder", {});
-        telegram.alerts.intruder();
+        sendEmail({
+          subject: "🚨 KHẨN CẤP: Phát hiện xâm nhập!",
+          html: alertEmail({
+            icon: "🚨",
+            title: "Cảnh báo xâm nhập",
+            rows: [
+              ["Trạng thái", "PHÁT HIỆN XÂM NHẬP", true],
+              ["Thời gian", new Date().toLocaleString("vi-VN"), true],
+              [
+                "Hành động",
+                "Kiểm tra camera và liên hệ cơ quan chức năng nếu cần",
+                true,
+              ],
+            ],
+          }),
+        }).catch(console.error);
       }
       break;
   }
@@ -180,7 +293,6 @@ const init = (io) => {
 
   client.on("connect", () => {
     console.log("MQTT connected");
-    // Subscribe tất cả topic cần lắng nghe
     const subscribeTopics = [
       TOPICS.DOOR_STATUS,
       TOPICS.DOOR_ACCESS,
