@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getLogs } from '../api/statsApi';
 import {
   ShieldCheck, ShieldAlert, CreditCard, Flame,
   AlertTriangle, Thermometer, CloudRain, BarChart2,
-  ChevronLeft, ChevronRight, Inbox,
+  ChevronLeft, ChevronRight, Inbox, RefreshCw,
 } from 'lucide-react';
+import ExportDropdown from '../components/ui/ExportDropdown';
+import { exportCSV, exportPDF } from '../utils/exportUtils';
+
+const REFRESH_INTERVAL = 10_000;
 
 const DEVICES = [
   { key: 'all',      label: 'Tất cả' },
@@ -33,28 +37,82 @@ const DEVICE_COLORS = {
 };
 
 const LogsPage = () => {
-  const [logs,    setLogs]    = useState([]);
-  const [total,   setTotal]   = useState(0);
-  const [page,    setPage]    = useState(1);
-  const [device,  setDevice]  = useState('all');
-  const [loading, setLoading] = useState(false);
+  const [logs,        setLogs]        = useState([]);
+  const [total,       setTotal]       = useState(0);
+  const [page,        setPage]        = useState(1);
+  const [device,      setDevice]      = useState('all');
+  const [loading,     setLoading]     = useState(false);   // Lần đầu load
+  const [refreshing,  setRefreshing]  = useState(false);   // Background refresh
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [countdown,   setCountdown]   = useState(REFRESH_INTERVAL / 1000);
+  const isFirstLoad = useRef(true);
   const limit = 20;
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
+  const fetchLogs = useCallback(async (isBackground = false) => {
+    if (isBackground) setRefreshing(true);
+    else              setLoading(true);
+
     try {
       const params = { limit, page, ...(device !== 'all' && { device }) };
       const res    = await getLogs(params);
       setLogs(res.data.data);
       setTotal(res.data.total);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+      setLastUpdated(new Date());
+      setCountdown(REFRESH_INTERVAL / 1000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (isBackground) setRefreshing(false);
+      else              setLoading(false);
+      isFirstLoad.current = false;
+    }
   }, [page, device]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  // Fetch khi page/device thay đổi
+  useEffect(() => {
+    isFirstLoad.current = true;
+    fetchLogs(false);
+  }, [fetchLogs]);
+
   useEffect(() => { setPage(1); }, [device]);
 
+  // Auto-refresh interval
+  useEffect(() => {
+    const timer = setInterval(() => fetchLogs(true), REFRESH_INTERVAL);
+    return () => clearInterval(timer);
+  }, [fetchLogs]);
+
+  // Countdown hiển thị
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setCountdown((c) => (c <= 1 ? REFRESH_INTERVAL / 1000 : c - 1));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [lastUpdated]);
+
   const totalPages = Math.ceil(total / limit);
+
+  const [exporting, setExporting] = useState(false);
+ 
+  const handleExport = async (type) => {
+    setExporting(true);
+    try {
+      // Fetch toàn bộ log theo filter đang chọn (không giới hạn trang)
+      const params = { limit: 9999, page: 1, ...(device !== 'all' && { device }) };
+      const res = await getLogs(params);
+      const allLogs = res.data.data;
+  
+      const deviceLabel = device === 'all' ? 'tat-ca' : device;
+      const filename = `logs_${deviceLabel}_${new Date().toISOString().slice(0, 10)}`;
+  
+      if (type === 'csv') exportCSV(allLogs, `${filename}.csv`);
+      else                exportPDF(allLogs, `${filename}.pdf`);
+    } catch (e) {
+      console.error('Export error:', e);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2xl)' }}>
@@ -69,17 +127,62 @@ const LogsPage = () => {
             Nhật ký sự kiện từ tất cả các thiết bị
           </p>
         </div>
-        <span style={{
-          fontSize: 12,
-          color: 'var(--text-muted)',
-          background: 'var(--bg-muted)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-full)',
-          padding: '4px 14px',
-          fontWeight: 500,
-        }}>
-          {total} bản ghi
-        </span>
+
+        {/* Badge tổng + nút refresh + countdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Countdown + trạng thái */}
+          <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>
+            {refreshing
+              ? 'Đang cập nhật...'
+              : lastUpdated
+                ? `Cập nhật sau ${countdown}s`
+                : ''}
+          </span>
+
+          {/* Nút refresh thủ công */}
+          <button
+            onClick={() => fetchLogs(true)}
+            disabled={refreshing || loading}
+            title="Làm mới ngay"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 30, height: 30,
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-default)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-muted)',
+              cursor: refreshing || loading ? 'not-allowed' : 'pointer',
+              opacity: refreshing || loading ? 0.5 : 1,
+              transition: 'all 0.15s',
+            }}
+          >
+            <RefreshCw
+              size={13}
+              strokeWidth={1.8}
+              style={{
+                animation: refreshing ? 'spin 0.8s linear infinite' : 'none',
+              }}
+            />
+          </button>
+
+          <ExportDropdown
+            onExport={handleExport}
+            disabled={exporting || loading}
+            exporting={exporting}
+          />
+
+          <span style={{
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            background: 'var(--bg-muted)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-full)',
+            padding: '4px 14px',
+            fontWeight: 500,
+          }}>
+            {total} bản ghi
+          </span>
+        </div>
       </div>
 
       {/* ── Filter tabs ── */}
@@ -123,6 +226,9 @@ const LogsPage = () => {
         border: '1px solid var(--border-default)',
         boxShadow: 'var(--shadow-card)',
         overflow: 'hidden',
+        // Hiệu ứng mờ nhẹ khi đang background refresh
+        opacity: refreshing ? 0.75 : 1,
+        transition: 'opacity 0.3s',
       }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -303,7 +409,6 @@ const LogsPage = () => {
                 Trước
               </button>
 
-              {/* Page number pills */}
               <div style={{ display: 'flex', gap: 4 }}>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let p;

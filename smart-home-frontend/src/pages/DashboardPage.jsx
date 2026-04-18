@@ -108,9 +108,8 @@ const DashboardPage = () => {
       .catch(console.error);
   }, []);
 
-  useEffect(() => {
-    // Fetch tất cả dữ liệu lần đầu
-    fetchSummary();
+  // 👇 Tách ra useCallback như fetchSummary
+  const fetchCharts = useCallback(() => {
     getAccessStats(7)
       .then((r) => setAccessData(r.data))
       .catch(console.error);
@@ -124,17 +123,27 @@ const DashboardPage = () => {
             }),
             temp: d.temp,
             hum: d.hum,
-          })),
-        ),
+          }))
+        )
       )
       .catch(console.error);
+  }, []);
 
-    // Polling summary mỗi 10 giây — không cần reset trang nữa
-    const summaryInterval = setInterval(fetchSummary, 10_000);
-    return () => clearInterval(summaryInterval);
-  }, [fetchSummary]);
+  useEffect(() => {
+    // Fetch lần đầu
+    fetchSummary();
+    fetchCharts(); // 👈 thay vì gọi trực tiếp như cũ
 
-  // Re-fetch summary ngay khi trạng thái cảnh báo thay đổi
+    // Polling chung 10s
+    const interval = setInterval(() => {
+      fetchSummary();
+      fetchCharts(); // 👈 thêm vào đây
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [fetchSummary, fetchCharts]);
+
+  // Giữ nguyên cái này
   useEffect(() => {
     fetchSummary();
   }, [intruderAlert, gas, fetchSummary]);
