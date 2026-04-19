@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "793385935392",
+    "project_id": "smart-home-datn",
+    "storage_bucket": "smart-home-datn.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793385935392:android:207fba47ebdbdc000b5245",
+        "android_client_info": {
+          "package_name": "com.example.smart_home_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChsweTyWc3jHnzM-0MpfwQ5j4Kw-R7Jes"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

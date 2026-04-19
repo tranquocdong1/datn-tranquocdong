@@ -1,6 +1,8 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:smart_home_app/services/notification_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/device_provider.dart';
 import 'providers/theme_provider.dart';
@@ -13,6 +15,8 @@ import 'config/app_colors.dart';   // AppTheme (light/dark ThemeData)
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await NotificationService().init();
   await initializeDateFormatting('vi', null);
   ApiService().init();
 

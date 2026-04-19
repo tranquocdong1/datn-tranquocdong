@@ -138,6 +138,17 @@ exports.resendOTP = async (req, res) => {
   }
 };
 
+// Thêm endpoint này
+exports.saveFCMToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    await User.findByIdAndUpdate(req.user.id, { fcmToken: token });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi lưu token' });
+  }
+};
+
 // GET /api/auth/me
 exports.me = async (req, res) => {
   try {

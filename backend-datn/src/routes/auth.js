@@ -115,4 +115,6 @@ router.post("/resend-otp", ctrl.resendOTP);
  */
 router.get("/me", auth, ctrl.me);
 
+router.post('/fcm-token', auth, ctrl.saveFCMToken);
+
 module.exports = router;
