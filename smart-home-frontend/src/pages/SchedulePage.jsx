@@ -18,7 +18,7 @@ const DEVICES = [
 const ACTIONS = {
   fan:         ['ON', 'OFF', 'AUTO'],
   living_led:  ['ON', 'OFF', 'AUTO'],
-  bedroom_led: ['ON', 'OFF', 'AUTO'],
+  bedroom_led: ['ON', 'OFF'],
   clothes:     ['IN', 'OUT', 'AUTO'],
   door:        ['OPEN', 'CLOSE'],
 };
@@ -28,14 +28,22 @@ const ACTION_LABEL = {
   OPEN: 'Mở', CLOSE: 'Đóng',
 };
 const ACTION_COLOR = {
-  ON: '#3D9B63', OFF: '#888780', AUTO: '#8B5CF6',
-  IN: '#3B82F6', OUT: '#3D9B63',
-  OPEN: '#EF9F27', CLOSE: '#3D9B63',
+  ON:    'var(--success-text)',
+  OFF:   'var(--text-muted)',
+  AUTO:  '#8B5CF6',
+  IN:    '#3B82F6',
+  OUT:   'var(--success-text)',
+  OPEN:  'var(--warning-text)',
+  CLOSE: 'var(--success-text)',
 };
 const ACTION_BG = {
-  ON: '#EAF7F0', OFF: '#F0EDE8', AUTO: '#F5F3FF',
-  IN: '#EFF6FF', OUT: '#EAF7F0',
-  OPEN: '#FFF8EC', CLOSE: '#EAF7F0',
+  ON:    'var(--success-bg)',
+  OFF:   'var(--bg-muted)',
+  AUTO:  '#F5F3FF',
+  IN:    '#EFF6FF',
+  OUT:   'var(--success-bg)',
+  OPEN:  'var(--warning-bg)',
+  CLOSE: 'var(--success-bg)',
 };
 
 const EMPTY_FORM = {
@@ -45,34 +53,34 @@ const EMPTY_FORM = {
 
 // ── Shared style tokens ──────────────────────────────────────────────────────
 const COLOR = {
-  bg:         '#F7F5F0',
-  card:       '#FFFFFF',
-  border:     '#EDEBE6',
-  accent:     '#EF9F27',
-  accentLight:'#FAC775',
-  accentBg:   '#FFF8EC',
-  text:       '#1A1A1A',
-  muted:      '#888780',
-  hint:       '#B4B2A9',
+  bg:         'var(--bg-base)',
+  card:       'var(--bg-card)',
+  border:     'var(--border-default)',
+  accent:     'var(--accent-primary)',
+  accentLight:'var(--accent-light)',
+  accentBg:   'var(--accent-pale)',
+  text:       'var(--text-heading)',
+  muted:      'var(--text-muted)',
+  hint:       'var(--text-hint)',
 };
 
 const cardStyle = {
   background:   COLOR.card,
   borderRadius: 18,
-  boxShadow:    '0 2px 12px rgba(0,0,0,0.06)',
-  border:       `1px solid ${COLOR.border}`,
+  boxShadow:    'var(--shadow-card)',
+  border:       '1px solid var(--border-default)',
 };
 
 const inputStyle = {
   width:        '100%',
   padding:      '9px 13px',
   borderRadius: 10,
-  border:       `1px solid ${COLOR.border}`,
+  border:       '1px solid var(--border-default)',
   fontSize:     13,
   outline:      'none',
   boxSizing:    'border-box',
   color:        COLOR.text,
-  background:   '#FAFAF8',
+  background:   'var(--bg-muted)',
   fontFamily:   'inherit',
 };
 
@@ -191,7 +199,7 @@ const SchedulePage = () => {
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 22px', borderRadius: 50, border: 'none',
-            background: COLOR.accent, color: '#fff',
+            background: COLOR.accent, color: 'var(--bg-card)',
             fontSize: 13, fontWeight: 500, cursor: 'pointer',
             letterSpacing: '0.2px', transition: 'background 0.2s',
           }}
@@ -211,7 +219,7 @@ const SchedulePage = () => {
               width="140" height="90" viewBox="0 0 140 90">
               <defs>
                 <pattern id="dp" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
-                  <circle cx="2" cy="2" r="1.5" fill="#EF9F27" />
+                  <circle cx="2" cy="2" r="1.5" fill="var(--accent-primary)" />
                 </pattern>
               </defs>
               <rect width="140" height="90" fill="url(#dp)" />
@@ -288,7 +296,7 @@ const SchedulePage = () => {
                 <div style={{
                   padding: '10px 20px',
                   background: COLOR.accentBg,
-                  border: `1px solid ${COLOR.accentLight}`,
+                  border: '1px solid var(--accent-light)',
                   borderRadius: 10,
                   color: COLOR.accent,
                   fontWeight: 300,
@@ -310,8 +318,8 @@ const SchedulePage = () => {
                       onClick={() => toggleDay(i)}
                       style={{
                         width: 40, height: 40, borderRadius: '50%', border: 'none',
-                        background: form.days.includes(i) ? COLOR.accent : '#F0EDE8',
-                        color:      form.days.includes(i) ? '#fff'        : COLOR.muted,
+                        background: form.days.includes(i) ? COLOR.accent : 'var(--bg-muted)',
+                        color:      form.days.includes(i) ? 'var(--bg-card)' : COLOR.muted,
                         fontWeight: 500, fontSize: 11, cursor: 'pointer',
                         transition: 'all 0.15s', letterSpacing: 0,
                       }}
@@ -321,9 +329,9 @@ const SchedulePage = () => {
                   ))}
                   {/* Quick-select pills */}
                   {[
-                    { label: 'T2–T6',    days: [1,2,3,4,5],     bg: '#F0FDF4', color: '#3D9B63' },
-                    { label: 'Cuối tuần',days: [0,6],           bg: COLOR.accentBg, color: COLOR.accent },
-                    { label: 'Hàng ngày',days: [0,1,2,3,4,5,6], bg: '#F5F3FF', color: '#8B5CF6' },
+                    { label: 'T2–T6',     days: [1,2,3,4,5],     bg: 'var(--success-bg)',  color: 'var(--success-text)' },
+                    { label: 'Cuối tuần', days: [0,6],            bg: 'var(--accent-pale)', color: 'var(--warning-text)' },
+                    { label: 'Hàng ngày', days: [0,1,2,3,4,5,6], bg: 'var(--bg-muted)',    color: 'var(--text-muted)'   },
                   ].map(({ label, days, bg, color }) => (
                     <button
                       key={label}
@@ -346,7 +354,7 @@ const SchedulePage = () => {
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="submit" disabled={loading} style={{
                   padding: '10px 26px', borderRadius: 50, border: 'none',
-                  background: loading ? COLOR.hint : COLOR.accent, color: '#fff',
+                  background: loading ? COLOR.hint : COLOR.accent, color: 'var(--bg-card)',
                   fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer',
                   letterSpacing: '0.2px',
                 }}>
@@ -356,7 +364,7 @@ const SchedulePage = () => {
                   onClick={() => { setShowForm(false); setEditId(null); setForm(EMPTY_FORM); }}
                   style={{
                     padding: '10px 20px', borderRadius: 50,
-                    border: `1px solid ${COLOR.border}`, background: '#fff',
+                    border: '1px solid var(--border-default)', background: 'var(--bg-card)',
                     color: COLOR.muted, fontSize: 13, cursor: 'pointer',
                   }}>
                   Hủy
@@ -390,8 +398,8 @@ const SchedulePage = () => {
                 {/* Giờ */}
                 <div style={{
                   minWidth: 68, textAlign: 'center',
-                  background: s.enabled ? COLOR.accentBg : '#F7F5F0',
-                  border: `1px solid ${s.enabled ? COLOR.accentLight : COLOR.border}`,
+                  background: s.enabled ? 'var(--accent-pale)' : 'var(--bg-muted)',
+                  border: `1px solid ${s.enabled ? 'var(--accent-pale-border)' : 'var(--border-default)'}`,
                   borderRadius: 12, padding: '10px 8px',
                 }}>
                   <div style={{
@@ -431,8 +439,8 @@ const SchedulePage = () => {
                       width: 26, height: 26, borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 10, fontWeight: 500,
-                      background: s.days.includes(i) ? COLOR.accent : '#F0EDE8',
-                      color:      s.days.includes(i) ? '#fff'        : '#C4C2BB',
+                      background: s.days.includes(i) ? COLOR.accent : 'var(--bg-muted)',
+                      color:      s.days.includes(i) ? 'var(--bg-card)' : COLOR.hint,
                     }}>
                       {d}
                     </span>
@@ -454,8 +462,8 @@ const SchedulePage = () => {
                     title={s.enabled ? 'Tắt lịch' : 'Bật lịch'}
                     style={{
                       width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                      background: s.enabled ? '#F0FDF4' : '#F0EDE8',
-                      color:      s.enabled ? '#3D9B63' : COLOR.hint,
+                      background: s.enabled ? 'var(--success-bg)' : 'var(--bg-muted)',
+                      color:      s.enabled ? 'var(--success-text)' : COLOR.hint,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'all 0.15s',
                     }}
@@ -481,7 +489,7 @@ const SchedulePage = () => {
                     title="Xóa"
                     style={{
                       width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                      background: '#FEF2F2', color: '#E05252',
+                      background: 'var(--danger-bg)', color: 'var(--danger-text)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'all 0.15s',
                     }}
