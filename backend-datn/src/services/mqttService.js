@@ -80,6 +80,16 @@ const handleMessage = async (topic, message) => {
       socket.emit("rain:status", { status: msg });
       break;
 
+    // ✅ FIX: Thêm xử lý giàn phơi
+    case TOPICS.CLOTHES_STATUS:
+      await updateState({ "clothes.status": msg });
+      socket.emit("clothes:status", { status: msg });
+      break;
+
+    case TOPICS.CLOTHES_WARNING:
+      socket.emit("clothes:warning", { reason: msg });
+      break;
+
     // 🔴 1. CẢNH BÁO NHIỆT ĐỘ CAO
     case TOPICS.ROOM_DHT: {
       try {
@@ -170,7 +180,7 @@ const init = (io) => {
   client = mqtt.connect(
     `mqtt://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`,
     {
-      clientId: process.env.MQTT_CLIENT_ID,
+      clientId: `${process.env.MQTT_CLIENT_ID}_${Math.random().toString(16).slice(2, 8)}`,
       username: process.env.MQTT_USER,
       password: process.env.MQTT_PASSWORD,
       reconnectPeriod: 3000,
