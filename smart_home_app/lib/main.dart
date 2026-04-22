@@ -2,16 +2,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:smart_home_app/services/notification_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/device_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/api_service.dart';
 import 'services/socket_service.dart';
+import 'services/navigation_service.dart';
+import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
-import 'config/api_config.dart';   // AppColors + ApiConfig đều ở đây
-import 'config/app_colors.dart';   // AppTheme (light/dark ThemeData)
+import 'config/api_config.dart';
+import 'config/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,10 @@ class SmartHomeApp extends StatelessWidget {
     return MaterialApp(
       title: 'Smart Home',
       debugShowCheckedModeBanner: false,
+
+      // ← Gắn navigatorKey để NotificationService navigate được
+      navigatorKey: NavigationService().navigatorKey,
+
       theme:     AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeProvider.themeMode,
@@ -120,7 +125,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (_checking) {
       return const Scaffold(
         body: Center(
-          // AppColors.amber từ api_config.dart — không còn ambiguous
           child: CircularProgressIndicator(color: Color(AppColors.amber)),
         ),
       );

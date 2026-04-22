@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/device_provider.dart';
 import '../services/socket_service.dart';
+import '../services/navigation_service.dart';
 import '../config/api_config.dart';
 import '../config/app_colors.dart';
 import '../widgets/theme_toggle.dart';
@@ -32,16 +33,31 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   final List<_NavItem> _navItems = const [
-    _NavItem(icon: Icons.dashboard_outlined,       activeIcon: Icons.dashboard,        label: 'Dashboard'),
-    _NavItem(icon: Icons.door_front_door_outlined,  activeIcon: Icons.door_front_door,  label: 'Cửa & Thẻ'),
+    _NavItem(icon: Icons.dashboard_outlined,      activeIcon: Icons.dashboard,        label: 'Dashboard'),
+    _NavItem(icon: Icons.door_front_door_outlined, activeIcon: Icons.door_front_door,  label: 'Cửa & Thẻ'),
     _NavItem(icon: Icons.living_outlined,           activeIcon: Icons.living,           label: 'Phòng'),
     _NavItem(icon: Icons.dry_cleaning_outlined,     activeIcon: Icons.dry_cleaning,     label: 'Giàn phơi'),
     _NavItem(icon: Icons.schedule_outlined,         activeIcon: Icons.schedule,         label: 'Hẹn giờ'),
     _NavItem(icon: Icons.history_outlined,          activeIcon: Icons.history,          label: 'Lịch sử'),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    NavigationService().setTabChangeCallback((index) {
+      if (mounted) setState(() => _currentIndex = index);
+    });
+  }
+
+  @override
+  void dispose() {
+    NavigationService().clearTabChangeCallback();
+    super.dispose();
+  }
+
   void _logout() async {
     SocketService().disconnect();
+    NavigationService().clearTabChangeCallback();
     await context.read<AuthProvider>().logout();
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/');
@@ -78,23 +94,24 @@ class _MainScreenState extends State<MainScreen> {
         ]),
         actions: [
           if (device.hasAlert)
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: const Color(AppColors.dangerBg),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(children: [
-                const Icon(Icons.warning_amber, size: 14, color: Color(AppColors.danger)),
-                const SizedBox(width: 4),
-                Text(
-                  device.intruderAlert ? 'Xâm nhập!' : 'Khí gas!',
-                  style: const TextStyle(
-                    fontSize: 11, color: Color(AppColors.danger), fontWeight: FontWeight.w600,
-                  ),
+            GestureDetector(
+              onTap: () => setState(() => _currentIndex = 2),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: const Color(AppColors.dangerBg),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ]),
+                child: Row(children: [
+                  const Icon(Icons.warning_amber, size: 14, color: Color(AppColors.danger)),
+                  const SizedBox(width: 4),
+                  Text(
+                    device.intruderAlert ? 'Xâm nhập!' : 'Khí gas!',
+                    style: const TextStyle(fontSize: 11, color: Color(AppColors.danger), fontWeight: FontWeight.w600),
+                  ),
+                ]),
+              ),
             ),
 
           const Padding(
@@ -104,28 +121,7 @@ class _MainScreenState extends State<MainScreen> {
 
           IconButton(
             icon: Icon(Icons.logout_outlined, size: 20, color: context.textMuted),
-            onPressed: () => showDialog(
-              context: context,
-              builder: (_) => AlertDialog(
-                backgroundColor: bgCard,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: Text('Đăng xuất', style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w500, color: context.textHeading,
-                )),
-                content: Text('Bạn có chắc muốn đăng xuất?', style: TextStyle(color: context.textBody)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Hủy', style: TextStyle(color: context.textMuted)),
-                  ),
-                  ElevatedButton(
-                    onPressed: () { Navigator.pop(context); _logout(); },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(AppColors.amber)),
-                    child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
-                  ),
-                ],
-              ),
-            ),
+            onPressed: () => _showLogoutDialog(bgCard),
           ),
           const SizedBox(width: 4),
         ],
@@ -137,53 +133,81 @@ class _MainScreenState extends State<MainScreen> {
 
       body: IndexedStack(index: _currentIndex, children: _screens),
 
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: bgCard,
-          border: Border(top: BorderSide(color: border)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2))],
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 60,
-            child: Row(
-              children: List.generate(_navItems.length, (i) {
-                final item   = _navItems[i];
-                final active = _currentIndex == i;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _currentIndex = i),
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          active ? item.activeIcon : item.icon,
-                          size: 22,
-                          color: active ? const Color(AppColors.amber) : textHint,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(item.label, style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-                          color: active ? const Color(AppColors.amber) : textHint,
-                        )),
-                      ],
-                    ),
+      // Đã lược bỏ FloatingActionButton (nút Mic nổi)
+      bottomNavigationBar: _buildBottomNav(bgCard, border, textHint),
+    );
+  }
+
+  Widget _buildBottomNav(Color bgCard, Color border, Color textHint) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgCard,
+        border: Border(top: BorderSide(color: border)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2))],
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            // Hiển thị cả 6 tab dàn đều, không còn khoảng trống ở giữa
+            children: List.generate(_navItems.length, (i) {
+              final item = _navItems[i];
+              final active = _currentIndex == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _currentIndex = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        active ? item.activeIcon : item.icon,
+                        size: 22,
+                        color: active ? const Color(AppColors.amber) : textHint,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(item.label, style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                        color: active ? const Color(AppColors.amber) : textHint,
+                      )),
+                    ],
                   ),
-                );
-              }),
-            ),
+                ),
+              );
+            }),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(Color bgCard) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Đăng xuất', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: context.textHeading)),
+        content: Text('Bạn có chắc muốn đăng xuất?', style: TextStyle(color: context.textBody)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Hủy', style: TextStyle(color: context.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(context); _logout(); },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(AppColors.amber)),
+            child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _NavItem {
-  final IconData icon;
-  final IconData activeIcon;
+  final IconData icon, activeIcon;
   final String label;
   const _NavItem({required this.icon, required this.activeIcon, required this.label});
 }

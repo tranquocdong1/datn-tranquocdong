@@ -3,8 +3,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_service.dart';
+import 'navigation_service.dart';
 
-// Xử lý thông báo khi app bị tắt hoàn toàn (background handler PHẢI là top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -17,108 +17,130 @@ class NotificationService {
   NotificationService._internal();
 
   final _fcm = FirebaseMessaging.instance;
-  final _localNotifications = FlutterLocalNotificationsPlugin();
+  final _local = FlutterLocalNotificationsPlugin();
+  final _nav = NavigationService();
 
-  // Channel riêng cho cảnh báo quan trọng (gas, xâm nhập)
+  // ── 2 channels khớp với fcmService.js ──────────────────────────────────
+  // 'smart_home_alert'  → gas, xâm nhập, nhiệt độ cao  (type: 'alert')
+  // 'smart_home_info'   → (hiện chưa dùng, giữ lại cho tương lai)
   static const _alertChannel = AndroidNotificationChannel(
     'smart_home_alert',
     'Cảnh báo khẩn cấp',
-    description: 'Thông báo gas, xâm nhập, khẩn cấp',
+    description: 'Khí gas, xâm nhập, nhiệt độ cao',
     importance: Importance.max,
     playSound: true,
     enableVibration: true,
   );
 
-  // Channel cho thông báo thường (mưa, cửa...)
   static const _infoChannel = AndroidNotificationChannel(
     'smart_home_info',
     'Thông báo thông thường',
-    description: 'Mưa, cửa mở/đóng, giàn phơi',
+    description: 'Thông báo chung',
     importance: Importance.defaultImportance,
   );
 
   Future<void> init() async {
-    // Đăng ký background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Xin quyền thông báo
     await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      criticalAlert: true, // iOS quan trọng
+      alert: true, badge: true, sound: true, criticalAlert: true,
     );
 
-    // Tạo Android notification channels
-    final androidPlugin = _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    // Tạo channels
+    final androidPlugin = _local
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(_alertChannel);
     await androidPlugin?.createNotificationChannel(_infoChannel);
 
     // Khởi tạo local notifications
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    await _localNotifications.initialize(
-      const InitializationSettings(android: androidSettings),
-      onDidReceiveNotificationResponse: _onNotificationTap,
+    await _local.initialize(
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      ),
+      onDidReceiveNotificationResponse: _onLocalTap,
     );
 
-    // Lắng nghe khi app đang MỞ (foreground)
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    // App ĐANG MỞ → hiện local notification
+    FirebaseMessaging.onMessage.listen(_onForeground);
 
-    // Lắng nghe khi user TAP vào notification (app ở background)
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+    // App ở BACKGROUND → user tap notification
+    FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      print('[FCM] Tap from background: ${msg.data}');
+      _navigate(msg.data);
+    });
 
-    // Lấy FCM token để gửi lên backend
+    // App BỊ TẮT HOÀN TOÀN → user tap để mở
+    final initial = await _fcm.getInitialMessage();
+    if (initial != null) {
+      print('[FCM] Tap from terminated: ${initial.data}');
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _navigate(initial.data);
+      });
+    }
+
+    // Lưu FCM token lên backend
     final token = await _fcm.getToken();
     if (token != null) {
       print('[FCM Token] $token');
-      await _saveFCMToken(token);
+      await _saveToken(token);
     }
-
-    // Lắng nghe khi token refresh
-    _fcm.onTokenRefresh.listen(_saveFCMToken);
+    _fcm.onTokenRefresh.listen(_saveToken);
   }
 
-  // Khi app đang mở → hiện local notification
-  void _handleForegroundMessage(RemoteMessage message) {
-    final notification = message.notification;
-    if (notification == null) return;
+  // ── Foreground: hiện local notification ──────────────────────────────────
+  void _onForeground(RemoteMessage message) {
+    final notif = message.notification;
+    if (notif == null) return;
 
+    // Khớp channelId với fcmService.js: type='alert' → smart_home_alert
     final isAlert = message.data['type'] == 'alert';
-    final channelId = isAlert ? 'smart_home_alert' : 'smart_home_info';
-    final channelName = isAlert ? 'Cảnh báo khẩn cấp' : 'Thông báo thường';
+    final channelId   = isAlert ? 'smart_home_alert' : 'smart_home_info';
+    final channelName = isAlert ? 'Cảnh báo khẩn cấp' : 'Thông báo thông thường';
 
-    _localNotifications.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
+    _local.show(
+      notif.hashCode,
+      notif.title,
+      notif.body,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          channelId, channelName,
+          channelId,
+          channelName,
           importance: isAlert ? Importance.max : Importance.defaultImportance,
-          priority: isAlert ? Priority.max : Priority.defaultPriority,
+          priority:   isAlert ? Priority.max   : Priority.defaultPriority,
           icon: '@mipmap/ic_launcher',
+          styleInformation: BigTextStyleInformation(
+            notif.body ?? '',
+            contentTitle: notif.title,
+          ),
         ),
       ),
-      payload: message.data['screen'] ?? '/',
+      // Payload = screen để navigate khi tap
+      payload: message.data['screen'] ?? '/dashboard',
     );
   }
 
-  void _handleNotificationTap(RemoteMessage message) {
-    print('[FCM Tap] Navigate to: ${message.data['screen']}');
-    // Điều hướng đến màn hình tương ứng nếu cần
+  // ── Tap local notification ────────────────────────────────────────────────
+  void _onLocalTap(NotificationResponse response) {
+    print('[FCM] Local tap: ${response.payload}');
+    _nav.navigateToScreen(response.payload);
   }
 
-  void _onNotificationTap(NotificationResponse response) {
-    print('[Local Notification Tap] payload: ${response.payload}');
+  // ── Navigate theo data từ FCM ─────────────────────────────────────────────
+  // fcmService.js gửi 3 loại:
+  //   notifyGas      → screen: '/room'
+  //   notifyIntruder → screen: '/room'
+  //   notifyHighTemp → screen: '/room', + extra: temp, hum
+  void _navigate(Map<String, dynamic> data) {
+    _nav.navigateToScreen(data['screen']?.toString());
   }
 
-  Future<void> _saveFCMToken(String token) async {
+  Future<void> _saveToken(String token) async {
     try {
       await ApiService().dio.post('/auth/fcm-token', data: {'token': token});
-      print('[FCM] Token saved to backend');
+      print('[FCM] Token saved');
     } catch (e) {
-      print('[FCM] Error: $e');
+      print('[FCM] Save token error: $e');
     }
   }
 }
