@@ -214,21 +214,6 @@ const Navbar = () => {
           <Mic size={17} strokeWidth={1.5} />
         </button>
 
-        {/* 🔔 Bell */}
-        <button className="icon-btn" style={{ position: 'relative' }}>
-          <Bell size={17} strokeWidth={1.5} />
-          {hasAlert && (
-            <span
-              style={{
-                position: 'absolute', top: 8, right: 8,
-                width: 6, height: 6, borderRadius: '50%',
-                background: 'var(--danger-text)',
-                border: '1.5px solid var(--bg-card)',
-              }}
-            />
-          )}
-        </button>
-
         <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
 
         {/* USER */}
